@@ -9,7 +9,9 @@ itemrest(
   cor_method = "pearson",
   n_factors = NULL,
   extract = "uls",
-  rotate = "oblimin"
+  rotate = "oblimin",
+  min_loading = 0.3,
+  loading_diff = 0.1
 )
 }
 \arguments{
@@ -22,6 +24,10 @@ itemrest(
 \item{extract}{The factor extraction (estimation) method. See \code{psych::fa}. Default is \code{"uls"}.}
 
 \item{rotate}{The rotation method. See \code{psych::fa}. Default is \code{"oblimin"}.}
+
+\item{min_loading}{Minimum factor loading threshold. Default is 0.30.}
+
+\item{loading_diff}{Threshold for cross-loading identification. Default is 0.10. Can be "howard".}
 }
 \value{
 An object of class \code{itemrest_result}. This is a list containing the

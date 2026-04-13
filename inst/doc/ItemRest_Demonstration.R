@@ -26,10 +26,11 @@ if (requireNamespace("psych", quietly = TRUE)) {
 # Run the analysis
 if (exists("analysis_data")) {
   results <- itemrest(
-    data = analysis_data,
-    n_factors = 5,
-    cor_method = "pearson"
-  )
+  data = analysis_data,
+  n_factors = 5,
+  min_loading = 0.30,
+  loading_diff = 0.10
+)
 }
 
 ## ----print_optimal------------------------------------------------------------

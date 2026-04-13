@@ -10,6 +10,15 @@
 # HELPER (INTERNAL) FUNCTIONS
 # ===================================================================
 
+#' Check for cross-loading using Howard and Costello & Osborne criteria.
+#' @keywords internal
+howard <- function(primary, secondary) {
+  # An item is considered "clean" if:
+  # Primary loading >= 0.40, secondary loading < 0.30, and difference >= 0.20.
+  # Otherwise, it is identified as a cross-loading item.
+  return(!(primary >= 0.40 && secondary < 0.30 && (primary - secondary) >= 0.20))
+}
+
 #' Calculate basic descriptive statistics for a dataset.
 #' @keywords internal
 descriptive_stats <- function(data) {
@@ -64,21 +73,24 @@ sort_item_ids <- function(x) {
   gtools::mixedsort(x)
 }
 
-# ' Identify problematic items (low-loading or cross-loading).
+#' Identify problematic items (low-loading or cross-loading).
 #' @keywords internal
-identify_problem_items <- function(efa_res, primary_cutoff = 0.40, secondary_max = 0.30, diff_min = 0.20, low_loading_thresh = 0.30) {
+identify_problem_items <- function(efa_res, min_loading = 0.30, loading_diff = 0.10) {
   loadings <- abs(efa_res$loadings)
   items <- rownames(loadings)
   cross_3 <- c()
   cross_2 <- c()
   low_loading <- c()
+
   if (ncol(loadings) == 0) return(list(cross_3 = c(), cross_2 = c(), low_loading = c()))
 
   for (i in 1:nrow(loadings)) {
     item_loads <- loadings[i, ]
     primary <- max(item_loads, na.rm = TRUE)
 
-    if (all(item_loads < low_loading_thresh, na.rm = TRUE)) {
+    # 1. LOW LOADING CHECK:
+    # If it is smaller than the user-defined `min_loading` value, mark it as `low_loading`.
+    if (all(item_loads < min_loading, na.rm = TRUE)) {
       low_loading <- c(low_loading, items[i])
       next
     }
@@ -87,12 +99,20 @@ identify_problem_items <- function(efa_res, primary_cutoff = 0.40, secondary_max
       sorted_loads <- sort(item_loads, decreasing = TRUE)
       secondary <- sorted_loads[2]
 
-      secondary_check <- !(primary >= primary_cutoff && secondary < secondary_max && (primary - secondary) >= diff_min)
+      # 2. CROSS-LOADING CHECK:
+      # If the user selected `howard`, use the classic criterion (0.40-0.30-0.20).
+      # Otherwise, check whether the difference between the two loadings is smaller than `loading_diff`.
+      if (loading_diff == "howard") {
+        is_cross <- howard(primary, secondary)
+      } else {
+        is_cross <- (primary - secondary) < as.numeric(loading_diff)
+      }
 
-      if (secondary_check) {
-        if (sum(item_loads >= secondary_max, na.rm = TRUE) >= 3) {
+      if (is_cross) {
+        # 0.30 threshold is retained for categorization.
+        if (sum(item_loads >= 0.30, na.rm = TRUE) >= 3) {
           cross_3 <- c(cross_3, items[i])
-        } else if (sum(item_loads >= secondary_max, na.rm = TRUE) == 2) {
+        } else if (sum(item_loads >= 0.30, na.rm = TRUE) == 2) {
           cross_2 <- c(cross_2, items[i])
         }
       }
@@ -113,16 +133,20 @@ get_combinations <- function(items) {
 
 #' Test removal strategies and build a summary table.
 #' @keywords internal
-test_removals <- function(data, base_items, combs, n_factors, cor_method, extract, rotate) {
+test_removals <- function(data, base_items, combs, n_factors, cor_method, extract, rotate, min_loading, loading_diff) {
   summary_list <- list()
   total <- length(combs)
   pb <- utils::txtProgressBar(min = 0, max = total, style = 3)
+
   for (i in seq_along(combs)) {
     items_to_remove <- combs[[i]]
     remaining_items <- setdiff(base_items, items_to_remove)
+
     if (length(remaining_items) > n_factors) {
       efa_out <- efa_custom(data[, remaining_items, drop = FALSE], n_factors, cor_method, extract, rotate)
-      prob_items_test <- identify_problem_items(efa_out)
+
+      # Pass the new settings to the identify_problem_items function.
+      prob_items_test <- identify_problem_items(efa_out, min_loading, loading_diff)
 
       has_cross_loading <- length(prob_items_test$cross_2) > 0 || length(prob_items_test$cross_3) > 0
 
@@ -133,6 +157,7 @@ test_removals <- function(data, base_items, combs, n_factors, cor_method, extrac
       load_min <- if (length(valid_loads) > 0) formatC(min(valid_loads), digits = 2, format = "f") else NA
       load_max <- if (length(valid_loads) > 0) formatC(max(valid_loads), digits = 2, format = "f") else NA
       loading_range <- if(is.na(load_min)) "N/A" else paste0(load_min, "-", load_max)
+
       summary_list[[i]] <- data.frame(
         Removed_Items = removed_label, Total_Explained_Var = efa_out$explained_var,
         Factor_Loading_Range = loading_range, Cronbachs_Alpha = efa_out$alpha,
@@ -172,6 +197,8 @@ test_removals <- function(data, base_items, combs, n_factors, cor_method, extrac
 #' @param n_factors The number of factors. If `NULL`, it's determined automatically by parallel analysis.
 #' @param extract The factor extraction (estimation) method. See `psych::fa`. Default is `"uls"`.
 #' @param rotate The rotation method. See `psych::fa`. Default is `"oblimin"`.
+#' @param min_loading Minimum factor loading threshold. Default is 0.30.
+#' @param loading_diff Threshold for cross-loading identification. Default is 0.10. Can be "howard".
 #'
 #' @return An object of class `itemrest_result`. This is a list containing the
 #'   following components:
@@ -215,7 +242,9 @@ itemrest <- function(data,
                      cor_method = "pearson",
                      n_factors = NULL,
                      extract = "uls",
-                     rotate = "oblimin") {
+                     rotate = "oblimin",
+                     min_loading = 0.30,
+                     loading_diff = 0.10) {
 
   # --- Parameter Validation and Setup ---
   colnames(data) <- gsub("\\.", "_", colnames(data))
@@ -230,7 +259,7 @@ itemrest <- function(data,
   descriptives <- descriptive_stats(data)
   initial_efa <- efa_custom(data, n_factors_determined, cor_method, extract, rotate)
 
-  problem_items <- identify_problem_items(initial_efa)
+  problem_items <- identify_problem_items(initial_efa, min_loading = min_loading, loading_diff = loading_diff)
   all_problem_items <- sort_item_ids(unique(c(problem_items$cross_3, problem_items$cross_2, problem_items$low_loading)))
 
   message("--- Settings and Descriptive Statistics ---")
@@ -247,7 +276,11 @@ itemrest <- function(data,
   message("Cronbach's Alpha: ", formatC(initial_efa$alpha, digits = 3, format = "f"))
   message("Total Explained Variance: % ", formatC(initial_efa$explained_var * 100, digits = 2, format = "f"))
   message("Low-loading Items: ", ifelse(length(problem_items$low_loading) == 0, "None", paste(problem_items$low_loading, collapse = ", ")))
-
+  message("Minimum Loading Threshold: ", formatC(min_loading, digits = 2, format = "f"))
+  message("Loading Difference Criterion: ",
+          ifelse(loading_diff == "howard",
+                 "Howard (2016)",
+                 formatC(as.numeric(loading_diff), digits = 2, format = "f")))
   cross_items_combined <- c(problem_items$cross_2, problem_items$cross_3)
   message("Cross-loading Items: ", ifelse(length(cross_items_combined) == 0, "None", paste(unique(sort_item_ids(cross_items_combined)), collapse = ", ")))
 
@@ -262,7 +295,9 @@ itemrest <- function(data,
 
     # --- Display the progress bar ---
     message("\n[Info] Testing ", length(all_combs) - 1, " different removal combinations for low-quality items...")
-    removal_summary <- test_removals(data, colnames(data), all_combs, n_factors_determined, cor_method, extract, rotate)
+    removal_summary <- test_removals(data, colnames(data), all_combs, n_factors_determined,
+                                     cor_method, extract, rotate,
+                                     min_loading = min_loading, loading_diff = loading_diff)
 
     optimal_candidates <- removal_summary[ removal_summary[["Cross_Loading"]] == "No",
                                            , drop = FALSE ]

@@ -4,7 +4,17 @@
 \alias{test_removals}
 \title{Test removal strategies and build a summary table.}
 \usage{
-test_removals(data, base_items, combs, n_factors, cor_method, extract, rotate)
+test_removals(
+  data,
+  base_items,
+  combs,
+  n_factors,
+  cor_method,
+  extract,
+  rotate,
+  min_loading,
+  loading_diff
+)
 }
 \description{
 Test removal strategies and build a summary table.
