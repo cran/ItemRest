@@ -152,11 +152,11 @@ test_removals <- function(data, base_items, combs, n_factors, cor_method, extrac
 
       removed_label <- if (length(items_to_remove) == 0) "None" else paste(sort_item_ids(items_to_remove), collapse = "-")
       load_mat <- as.matrix(efa_out$loadings)
-      threshold <- 0.30
-      valid_loads <- abs(load_mat)[abs(load_mat) > threshold]
+      threshold <- min_loading
+      valid_loads <- load_mat[abs(load_mat) >= threshold]
       load_min <- if (length(valid_loads) > 0) formatC(min(valid_loads), digits = 2, format = "f") else NA
       load_max <- if (length(valid_loads) > 0) formatC(max(valid_loads), digits = 2, format = "f") else NA
-      loading_range <- if(is.na(load_min)) "N/A" else paste0(load_min, "-", load_max)
+      loading_range <- if(is.na(load_min)) "N/A" else paste0(load_min, "/", load_max)
 
       summary_list[[i]] <- data.frame(
         Removed_Items = removed_label, Total_Explained_Var = efa_out$explained_var,
