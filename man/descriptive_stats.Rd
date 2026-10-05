@@ -2,11 +2,11 @@
 % Please edit documentation in R/itemrest_core.R
 \name{descriptive_stats}
 \alias{descriptive_stats}
-\title{Calculate basic descriptive statistics for a dataset.}
+\title{Calculate basic descriptive statistics.}
 \usage{
 descriptive_stats(data)
 }
 \description{
-Calculate basic descriptive statistics for a dataset.
+Calculate basic descriptive statistics.
 }
 \keyword{internal}

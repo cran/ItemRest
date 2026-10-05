@@ -2,35 +2,21 @@
 % Please edit documentation in R/itemrest_core.R
 \name{print.itemrest_result}
 \alias{print.itemrest_result}
-\title{Print method for \code{itemrest_result} class}
+\title{Print Candidate Solutions from ItemRest}
 \usage{
-\method{print}{itemrest_result}(x, report = "optimal", ...)
+\method{print}{itemrest_result}(x, report = c("candidates", "all"), ...)
 }
 \arguments{
-\item{x}{An object of class \code{itemrest_result}.}
+\item{x}{An itemrest_result.}
 
-\item{report}{The type of report to generate: \code{"optimal"} (default) or \code{"all"}.}
+\item{report}{"candidates" (default) or "all". The old "optimal" value is a
+deprecated alias for "candidates".}
 
-\item{...}{Other arguments (not used).}
+\item{...}{Unused.}
 }
 \value{
-No return value, called for side effects (prints the report to the console).
+x, invisibly.
 }
 \description{
-Print method for \code{itemrest_result} class
-}
-\examples{
-\donttest{
-if (requireNamespace("psych", quietly = TRUE)) {
-  data(bfi, package = "psych")
-  example_data <- na.omit(bfi[, 1:25])
-  results <- itemrest(example_data, n_factors = 5)
-
-  # Print the default optimal report
-  print(results)
-
-  # Print the report of all strategies
-  print(results, report = "all")
-}
-}
+Print Candidate Solutions from ItemRest
 }

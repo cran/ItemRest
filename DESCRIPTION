@@ -1,7 +1,7 @@
 Package: ItemRest
 Title: Automated Item Removal Strategies for Exploratory Factor
         Analysis
-Version: 0.2.5
+Version: 1.0.0
 Authors@R: 
     c(
       person(given = "Ahmet", family = "Çalışkan",
@@ -11,10 +11,12 @@ Authors@R:
              email = "abdullahfarukkilic@gmail.com",
              role = c("aut"))
     )
-Description: Automates the identification and comparative evaluation of 
-    item-removal strategies in exploratory factor analysis, producing 
-    transparent summaries (explained variance, loading ranges, reliability) 
-    to support comfortable, reproducible decisions. The criteria are 
+Description: Identifies candidate item sets through threshold-driven iterative
+    removal searches in exploratory factor analysis. Provides a no-removal
+    baseline, numerical diagnostics, factor reliability, holdout evaluation,
+    and bootstrap search stability to support transparent screening and
+    documented content review rather than automatic measurement decisions.
+    The loading criteria are
     based on best practices and established heuristics (e.g., Costello & 
     Osborne (2005) <doi:10.7275/jyj1-4868>, Howard (2016) 
     <doi:10.1080/10447318.2015.1087664>). Includes flexible thresholds for 
@@ -22,16 +24,17 @@ Description: Automates the identification and comparative evaluation of
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.1)
-Imports: gtools, psych, qgraph, stats, utils
+Imports: clue, GPArotation, gtools, psych, qgraph, stats, tools, utils
 URL: https://github.com/ahmetcaliskan1987/ItemRest
 BugReports: https://github.com/ahmetcaliskan1987/ItemRest/issues
-Suggests: testthat (>= 3.0.0), knitr, rmarkdown
+Suggests: testthat (>= 3.2.0), knitr, rmarkdown, lavaan
 VignetteBuilder: knitr
-RoxygenNote: 7.3.3
+Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2026-04-14 11:23:36 UTC; ahmetcaliskan
+Config/roxygen2/version: 8.1.0
+Packaged: 2026-10-05 18:56:17 UTC; Faruk
 Author: Ahmet Çalışkan [aut, cre],
   Abdullah Faruk Kılıç [aut]
 Maintainer: Ahmet Çalışkan <ahmetcaliskan1987@gmail.com>
 Repository: CRAN
-Date/Publication: 2026-04-14 13:30:08 UTC
+Date/Publication: 2026-10-05 19:20:02 UTC

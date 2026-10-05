@@ -1,0 +1,83 @@
+test_that("holdout EFA uses the specified item sets without reselection", {
+  data <- real_factor_data(n = 400)
+  training <- itemrest(data[1:200, ], n_factors = 1, verbose = FALSE)
+  validation <- itemrest_validate(training, data[201:400, ])
+  expect_equal(validation$source_solution_ids, "S00001")
+  expect_equal(validation$validation_summary$N_Remaining, 5L)
+  expect_equal(validation$validation_summary$N_Obs, 200)
+  expect_true(is.matrix(validation$solution_details[[1]]$factor_congruence))
+  expect_warning(itemrest_validate(training, data[1:200, ]), "not independent")
+  expect_error(itemrest_validate(training, data[, 1:4]), "all discovery items")
+})
+
+test_that("split samples are disjoint, repeatable, and use the saved seed", {
+  data <- real_factor_data(n = 200)
+  set.seed(456)
+  before <- .Random.seed
+  first <- itemrest_split(data, seed = 44, n_factors = 1, verbose = FALSE)
+  second <- itemrest_split(data, seed = 44, n_factors = 1, verbose = FALSE)
+  expect_length(intersect(first$discovery_rows, first$validation_rows), 0)
+  expect_equal(sort(c(first$discovery_rows, first$validation_rows)), 1:200)
+  expect_identical(first$discovery_rows, second$discovery_rows)
+  expect_identical(.Random.seed, before)
+})
+
+test_that("CFA holds discovery assignments fixed on continuous and ordinal holdouts", {
+  skip_if_not_installed("lavaan")
+  data <- real_factor_data(n = 500)
+  training <- itemrest(data[1:250, ], n_factors = 1, verbose = FALSE)
+  validation <- itemrest_validate(training, data[251:500, ], method = "cfa")
+  expect_equal(validation$validation_summary$Estimator, "MLR")
+  expect_true(validation$validation_summary$Converged)
+  expect_true(is.finite(validation$validation_summary$CFI))
+  ordinal <- as.data.frame(lapply(data, function(x) as.numeric(cut(x, breaks = c(-Inf, -.7, 0, .7, Inf)))))
+  training_ord <- itemrest(ordinal[1:250, ], n_factors = 1, cor_method = "polychoric", verbose = FALSE)
+  holdout <- itemrest_validate(training_ord, ordinal[251:500, ], method = "cfa")
+  expect_equal(holdout$validation_summary$Estimator, "WLSMV")
+  expect_true(holdout$validation_summary$Converged)
+  expect_true(is.finite(holdout$validation_summary$CFI_Scaled))
+  expect_true(all(names(data) %in% training_ord$provenance$ordinal_items))
+  expect_gt(training_ord$removal_summary$Analysis_Correlation_Alpha,
+            training_ord$removal_summary$Standardized_Alpha)
+})
+
+test_that("bootstrap reruns searches and gives reproducible frequencies", {
+  data <- real_factor_data(n = 150)
+  training <- itemrest(data, n_factors = 1, verbose = FALSE)
+  set.seed(678)
+  before <- .Random.seed
+  first <- itemrest_bootstrap(training, data, n_boot = 4, seed = 66)
+  second <- itemrest_bootstrap(training, data, n_boot = 4, seed = 66)
+  expect_equal(first$item_stability, second$item_stability)
+  expect_equal(first$replicates, second$replicates)
+  expect_identical(.Random.seed, before)
+  expect_equal(first$settings$complete_replicates, 4L)
+  expect_equal(first$item_stability$Retained_In_Any_Candidate, rep(1, 5))
+  expect_equal(first$solution_stability$Candidate_Frequency, 1)
+  expect_error(itemrest_bootstrap(training, data[-1, ], n_boot = 2), "must match")
+})
+
+test_that("bootstrap excludes incomplete runs from frequency denominators", {
+  data <- fixture_data()
+  local_mocked_bindings(efa_custom = function(data, ...) make_test_efa(names(data), low = "I1"))
+  training <- itemrest(data, n_factors = 2, reliability = "none", max_solutions = 1, verbose = FALSE)
+  boot <- itemrest_bootstrap(training, data, n_boot = 2, seed = 55)
+  expect_equal(boot$replicates$Status, c("incomplete", "incomplete"))
+  expect_equal(boot$settings$complete_replicates, 0L)
+  expect_true(all(is.na(boot$item_stability$Retained_In_Any_Candidate)))
+})
+
+test_that("bootstrap excludes runs with a failed branch", {
+  data <- fixture_data()
+  local_mocked_bindings(efa_custom = function(data, ...) {
+    if (!"I1" %in% names(data)) stop("branch numerical failure")
+    make_test_efa(names(data), low = "I1")
+  })
+  training <- itemrest(data, n_factors = 2, reliability = "none", verbose = FALSE)
+  expect_false(training$search$complete)
+  expect_equal(training$search$termination, "numerical_failures")
+  boot <- itemrest_bootstrap(training, data, n_boot = 2, seed = 8)
+  expect_equal(boot$replicates$Status, c("failed", "failed"))
+  expect_equal(boot$replicates$N_Failed, c(1L, 1L))
+  expect_equal(boot$settings$complete_replicates, 0L)
+})

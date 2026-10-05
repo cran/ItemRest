@@ -2,11 +2,11 @@
 % Please edit documentation in R/itemrest_core.R
 \name{howard}
 \alias{howard}
-\title{Check for cross-loading using Howard and Costello & Osborne criteria.}
+\title{Check the Howard loading criteria.}
 \usage{
 howard(primary, secondary)
 }
 \description{
-Check for cross-loading using Howard and Costello & Osborne criteria.
+Check the Howard loading criteria.
 }
 \keyword{internal}

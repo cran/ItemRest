@@ -2,7 +2,7 @@
 % Please edit documentation in R/itemrest_core.R
 \name{itemrest}
 \alias{itemrest}
-\title{Evaluate Item Removal Strategies for Exploratory Factor Analysis (EFA)}
+\title{Identify Candidate Item Sets for Exploratory Factor Analysis}
 \usage{
 itemrest(
   data,
@@ -11,66 +11,135 @@ itemrest(
   extract = "uls",
   rotate = "oblimin",
   min_loading = 0.3,
-  loading_diff = 0.1
+  loading_diff = 0.1,
+  missing = c("listwise", "pairwise", "fail"),
+  min_items_per_factor = 3L,
+  max_factor_correlation = 0.85,
+  pd_action = c("fail", "smooth"),
+  reliability = c("alpha_omega", "alpha", "none"),
+  rank_by = c("none", "n_removed", "explained_variance"),
+  retain_items = character(),
+  item_reasons = NULL,
+  max_solutions = 10000L,
+  seed = NULL,
+  verbose = TRUE,
+  keys = NULL,
+  parallel_iterations = 100L,
+  ordinal_categories = 7L,
+  store_fits = FALSE,
+  parallel_method = c("fa", "pc")
 )
 }
 \arguments{
-\item{data}{A numeric \code{data.frame} or \code{matrix} for the analysis.}
+\item{data}{Numeric data.frame or matrix, with unique item names.}
 
-\item{cor_method}{The correlation method to use, e.g., \code{"pearson"} or \code{"polychoric"}.}
+\item{cor_method}{"pearson", "spearman", "kendall", or "polychoric". The last
+uses qgraph mixed correlations after detecting integer-valued ordinal items
+up to ordinal_categories observed categories (excluding missing values).}
 
-\item{n_factors}{The number of factors. If \code{NULL}, it's determined automatically by parallel analysis.}
+\item{n_factors}{Fixed factor count, or NULL for baseline parallel analysis.}
 
-\item{extract}{The factor extraction (estimation) method. See \code{psych::fa}. Default is \code{"uls"}.}
+\item{extract}{Extraction method passed to psych::fa; default "uls".}
 
-\item{rotate}{The rotation method. See \code{psych::fa}. Default is \code{"oblimin"}.}
+\item{rotate}{Rotation passed to psych::fa; default "oblimin".}
 
-\item{min_loading}{Minimum factor loading threshold. Default is 0.30.}
+\item{min_loading}{Minimum absolute primary loading; default 0.30.}
 
-\item{loading_diff}{Threshold for cross-loading identification. Default is 0.10. Can be "howard".}
+\item{loading_diff}{Minimum primary-secondary difference, or "howard".}
+
+\item{missing}{"listwise" (default), "pairwise", or "fail". Listwise handling
+is applied once across all baseline items, fixing observations across sets.
+Pairwise counts are recorded; their minimum is used as conservative n.obs.
+This does not resolve missing-data bias.}
+
+\item{min_items_per_factor}{Minimum qualifying primary items per factor;
+default 3. Flagged items do not count toward this threshold.}
+
+\item{max_factor_correlation}{Absolute factor correlation requiring review;
+default 0.85, a configurable screening threshold rather than a validity rule.}
+
+\item{pd_action}{"fail" or "smooth" for nonpositive definite correlations.
+Smoothed sets require review and are excluded from candidate screening.}
+
+\item{reliability}{"alpha_omega", "alpha", or "none". Raw, standardized,
+and selected-correlation alpha are distinguished. Model omega total uses
+sum(L Phi L') / (sum(L Phi L') + sum(uniquenesses)) for a unit-weighted
+standardized sum. It includes all common factors, is not omega hierarchical,
+and does not establish unidimensionality. No items are automatically reversed.}
+
+\item{rank_by}{"none" (discovery order), "n_removed" (ascending), or
+"explained_variance" (descending). No winner is selected. Explained variance
+is mean model communality within the retained set; values across different
+sets do not establish superiority.}
+
+\item{retain_items}{Item names protected from removal for content reasons.
+Protection does not waive screening criteria. A flagged protected item can
+prevent all candidate solutions; inspect Problem_Items and content_decisions.}
+
+\item{item_reasons}{Named character vector documenting item decisions.}
+
+\item{max_solutions}{Maximum queued/evaluated sets including baseline;
+default 10000. A bounded search is explicitly labelled incomplete.}
+
+\item{seed}{Integer seed. NULL uses the execution host's local calendar date
+in DDMMYYYY format (e.g. 05102026 is used numerically as 5102026). Both the
+formatted label and numeric seed are recorded. RNG state is restored on exit.}
+
+\item{verbose}{Print a brief search summary; default TRUE.}
+
+\item{keys}{Named numeric vector of 1 or -1 for specified items. Minus one
+explicitly reverses scoring by negating values. No automatic reverse scoring
+occurs; offsets do not affect correlations or reliability.}
+
+\item{parallel_iterations}{Number of parallel-analysis replications; default 100.}
+
+\item{ordinal_categories}{Maximum number of integer-valued categories detected
+as ordinal by the polychoric backend; default 7.}
+
+\item{store_fits}{Keep full psych EFA fit objects in solution_details; default
+FALSE retains loadings, Phi, communalities, reliability, and diagnostics.}
+
+\item{parallel_method}{"fa" (default) for reduced-matrix eigenvalues based on
+a one-factor minres fit, or "pc" for full-matrix component eigenvalues.
+Polychoric analysis permutes observed values within each item, preserving
+categories and missing positions, and computes the same correlation type
+for each reference sample. The 95th percentile is used for comparison.}
 }
 \value{
-An object of class \code{itemrest_result}. This is a list containing the
-following components:
-\item{descriptive_stats}{Basic descriptive statistics of the input data.}
-\item{initial_efa}{The results of the initial EFA before any items are removed.}
-\item{problem_items}{A list of items identified as low-loading or cross-loading.}
-\item{removal_summary}{A data.frame summarizing the results of all tested removal strategies.}
-\item{optimal_strategy}{The best-performing strategy that resulted in a clean factor structure (no cross-loadings).}
-\item{settings}{A list of the settings used for the analysis.}
+An itemrest_result containing candidate_solutions, removal_summary
+(baseline, failures, and skipped sets), solution_details (EFA, diagnostics,
+assignments, factor reliability, and first-discovered paths), initial_efa,
+problem_items, descriptive_stats, settings, search, content_decisions,
+data_summary, provenance, correlation_matrix (the original unsmoothed
+baseline matrix), and pairwise_n. correlation_matrix is NULL when no
+correlation could be computed. candidate_solutions may have zero rows.
+correlation_warnings and correlation_messages belong to the source matrix;
+they are recorded once and not attributed to every retained set. Estimator
+messages are recorded per set, but informational messages do not require
+review; explicit nonconvergence, unavailable rotation, variance problems,
+and matrix repair reports do.
+parallel_analysis records automatic factor-count diagnostics. Full EFA fit
+objects are included only when store_fits = TRUE.
+Screening eligibility is not substantive validity. The old optimal_strategy
+field is replaced by candidate_solutions.
+search$complete is FALSE for a limit or numerical branch failure; skipped
+underidentified sets remain documented terminal attempts.
 }
 \description{
-This function automates the process of identifying low-quality items (those
-with low factor loadings or significant cross-loadings) in an Exploratory
-Factor Analysis (EFA). It systematically tests various combinations of
-removing these problematic items and evaluates the impact on model fit,
-returning a comprehensive summary of all tested strategies.
+Reassesses remaining items after every removal and evaluates combinations of
+flagged items. This threshold-driven search in one sample does not establish
+an optimal, valid, or independently replicated measurement solution.
+Factor count is determined once at baseline and stays fixed.
+The original correlation matrix and observation counts are computed once
+for all baseline items, after missing-data handling and scoring keys. Each
+retained set uses the corresponding rows and columns. Positive-definiteness
+checks and any requested smoothing are applied separately to each subset.
 }
 \examples{
-\donttest{
-# We will use the 'bfi' dataset from the 'psych' package.
-# This requires the 'psych' package to be installed.
-if (requireNamespace("psych", quietly = TRUE)) {
-  data(bfi, package = "psych")
-
-  # 1. Prepare the data: Select the personality items (first 25 columns)
-  #    and remove rows with missing values for this example.
-  example_data <- bfi[, 1:25]
-  example_data <- na.omit(example_data)
-
-  # 2. Run the item removal analysis.
-  #    Based on theory, the Big Five model has 5 factors.
-  results <- itemrest(
-    data = example_data,
-    n_factors = 5,
-    cor_method = "pearson" # Data is not ordinal, so pearson is appropriate
-  )
-
-  # 3. Print the report for optimal strategies (default).
-  print(results)
-
-  # 4. Print the report for all tested strategies.
-  print(results, report = "all")
-}
-}
+set.seed(4)
+f <- rnorm(150)
+d <- data.frame(I1 = f + rnorm(150), I2 = f + rnorm(150),
+                I3 = f + rnorm(150), I4 = f + rnorm(150))
+result <- itemrest(d, n_factors = 1, seed = 10, verbose = FALSE)
+print(result)
 }

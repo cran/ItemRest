@@ -2,21 +2,25 @@
 % Please edit documentation in R/itemrest_core.R
 \name{test_removals}
 \alias{test_removals}
-\title{Test removal strategies and build a summary table.}
+\title{Iteratively evaluate removal strategies and retain failed attempts.}
 \usage{
 test_removals(
   data,
   base_items,
-  combs,
   n_factors,
   cor_method,
   extract,
   rotate,
   min_loading,
-  loading_diff
+  loading_diff,
+  options = analysis_options("listwise", 3L, 0.85, "fail", "alpha_omega"),
+  retain_items = character(),
+  max_solutions = 10000L,
+  correlation_cache = NULL,
+  store_fits = FALSE
 )
 }
 \description{
-Test removal strategies and build a summary table.
+Iteratively evaluate removal strategies and retain failed attempts.
 }
 \keyword{internal}
